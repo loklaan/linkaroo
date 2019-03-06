@@ -1,0 +1,14 @@
+{
+  "name": "linkaroo",
+  "version": "0.1.0",
+  "description": "Like npm link, but \"npm link -> copy -> untar\".",
+  "files": [
+    "cli.sh"
+  ],
+  "bin": {
+    "linkaroo": "./cli.sh"
+  },
+  "author": "Lochlan Bunn <bunn@lochlan.io>",
+  "license": "MIT",
+  "dependencies": {}
+}
