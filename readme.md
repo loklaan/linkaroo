@@ -12,6 +12,12 @@ Is `npm link` or `yarn link` not working for you?
 
 Well, try `linkaroo`.
 
+## Install
+
+```shell
+npm i -g linkaroo
+```
+
 ## Usage
 
 ##### First step: pack your package!
