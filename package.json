@@ -1,7 +1,7 @@
 {
   "name": "linkaroo",
   "version": "0.1.0",
-  "description": "Like npm link, but \"npm link -> copy -> untar\".",
+  "description": "Like npm link, but \"npm pack -> copy -> untar\".",
   "files": [
     "cli.sh"
   ],

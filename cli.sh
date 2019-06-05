@@ -4,6 +4,15 @@ IFS=$'\n\t'
 
 prog_name=$(basename $0)
 
+c_reset="\e[0m"
+c_bold="\e[1m"
+c_dim="\e[2m"
+c_uline="\e[4m"
+c_invert="\e[7m"
+c_red="\e[31m"
+c_green="\e[32m"
+c_blue="\e[34m"
+
 #/ Usage:
 #/
 #/   linkaroo pack
@@ -23,7 +32,7 @@ prog_name=$(basename $0)
 #/
 #/     Run the following in your other package or app:
 #/
-#/       linkaroo link "my-pkg" "/tmp/linkaroo/my-pkg-1.0.0.tgz"
+#/       linkaroo link "my-pkg@1.0.0"
 #/       ^ Copied to clipboard. :)
 #/
 #/     ...Bai!
@@ -31,10 +40,10 @@ prog_name=$(basename $0)
 #/   # Second step: unpack your packed package! (:
 #/
 #/   $ cd my-app
-#/   $ linkaroo link "my-pkg" "/tmp/linkaroo/my-pkg-0.1.0.tgz"
+#/   $ linkaroo link "my-pkg@1.0.0"
 #/     Linking "my-pkg"
 #/
-#/       my-pkg-0.1.0.tgz  ⟹   node_modules/my-pkg
+#/       Linkroo's Cache  ⟹  node_modules/my-pkg
 #/
 #/     ...Bai!
 #/
@@ -43,14 +52,23 @@ prog_name=$(basename $0)
 usage() { grep '^#/' "$0" | cut -c4- ; exit 0 ; }
 expr "$*" : ".*--help" > /dev/null && usage
 
-readonly LOG_FILE="/tmp/$(basename "$0").log"
+readonly LOG_FILE="$(node -pe "require('os').tmpdir()")/$(basename "$0").log"
+readonly LINKAROO_TMP_PATH="$(node -pe "require('os').tmpdir()")/linkaroo"
 info()    { echo -e "[INFO]  $@" | tee -a "$LOG_FILE" >&2 ; }
 warning() { echo -e "[WARN]  $@" | tee -a "$LOG_FILE" >&2 ; }
 error()   { echo -e "[ERROR] $@" | tee -a "$LOG_FILE" >&2 ; }
 fatal()   { echo -e "[FATAL] $@" | tee -a "$LOG_FILE" >&2 ; exit 1 ; }
 
 cleanup() {
-  echo -e "\n...Bai!"
+    case $? in
+        0*)
+          # successful exit
+            echo -e "\n...Bai! ✨"
+            ;;
+        *)
+          # do nothing on errors
+          ;;
+    esac
 }
 
 function clipboard_copy () {
@@ -79,32 +97,55 @@ function clipboard_copy () {
     esac
 }
 
+function package_ref_to_npm_tar () {
+  #     @foo/pkg@1.0.0-alpha.1  ->  foo-pkg-1.0.0-alpha.1.tgz
+  #          pkg@1.0.0-alpha.1  ->  pkg-1.0.0-alpha.1.tgz
+  echo "$(echo $1 | sed 's/^@//' | sed 's/[@\/]/-/g').tgz"
+}
+
+function package_ref_to_package_name () {
+  #     @foo/pkg@1.0.0-alpha.1  ->  @foo/pkg
+  #          pkg@1.0.0-alpha.1  ->  pkg
+  echo $1 | sed -e 's/\(.*\)@[0-9]\{1,99\}\..*/\1/'
+}
+
 function sub_pack () {
   local package_name="$(node -pe "require('./package.json').name")" && \
-  printf "Packing \"$package_name\"... " && \
-  local package_tar=$(npm pack --silent) && \
-  local tmp_package_path="/tmp/linkaroo/$package_tar" && \
-  mkdir -p /tmp/linkaroo && \
-  mv "./$package_tar" "$tmp_package_path"
-  echo "Packed!"
-  local link_cmd="linkaroo link \"$package_name\" \"$tmp_package_path\""
-  echo -e "\nRun the following in your other package or app:\n\n  $link_cmd" && \
+  local package_ver="$(node -pe "require('./package.json').version")" && \
+  local package_ref="$package_name@$package_ver" && \
+  printf "\nLinkaroo is packing \"${c_uline}$package_ref${c_reset}\"... " && \
+  local npm_tar="$(npm pack --silent)" && \
+  local npm_tar_in_tmp_path="$LINKAROO_TMP_PATH/$npm_tar" && \
+  mkdir -p ${LINKAROO_TMP_PATH} && \
+  mv "./$npm_tar" "$npm_tar_in_tmp_path" && \
+  printf "${c_green}Packed${c_reset}!\n" && \
+  local link_cmd="linkaroo link \"$package_ref\"" && \
+  printf "\n ${c_dim}\$${c_reset} ${c_bold}$link_cmd${c_reset}\n" && \
   printf "$link_cmd" | clipboard_copy && \
-  echo "  ^ Copied to clipboard. :)"
+  printf "   ${c_dim}^ Copied to clipboard 👍${c_reset}\n"
+  printf "     ${c_dim}Run in your other package or app.${c_reset}\n"
 }
 
 function sub_link () {
-  local package_name="${1:?required}"
-  local src_tgz="${2:?required}"
-  local package_dir="node_modules/$package_name"
-  local under_package_dir="$package_dir/package"
+  local package_ref="${1:?required}" && \
+  local package_name="$(package_ref_to_package_name ${package_ref})" && \
+  local npm_tar="$(package_ref_to_npm_tar ${package_ref})" && \
+  local package_dir="node_modules/$package_name" && \
+  local npm_tar_in_tmp_path="$LINKAROO_TMP_PATH/$npm_tar"
+  printf "\nLinking \"${c_uline}$package_ref${c_reset}\"... " && \
 
-  echo "Linking \"$package_name\""
-  echo ""
-  echo "  $(basename "$src_tgz")  ⟹   $package_dir"
-  rm -rf "$package_dir" && \
-  mkdir "$package_dir" && \
-  tar --strip=1 -C "$package_dir" -xzf "$src_tgz"
+  if [[ -f "$npm_tar_in_tmp_path" ]]; then
+    printf "${c_green}Linked$c_reset!\n" && \
+    rm -rf "$package_dir" && \
+    mkdir "$package_dir" && \
+    tar --strip=1 -C "$package_dir" -xzf "$npm_tar_in_tmp_path"
+  else
+    printf "${c_red}Error${c_reset}!\n" && \
+    printf "\n${c_red}The package \"${c_bold}$package_ref${c_reset}${c_red}\" has not been packed.${c_reset}\n" && \
+    printf "\n${c_dim}Are you sure ${c_bold}linkaroo pack${c_reset}${c_dim} was run from $package_name's directory?${c_reset}\n" && \
+    exit 1
+  fi
+
 }
 
 if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
