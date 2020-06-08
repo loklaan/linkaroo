@@ -1,3 +1,5 @@
+**Abandoned, as newer npm / yarn doesn't work will with plain copy pasta tarballs.**
+
 <p align="center">
   <img width="200px" src="https://gitcdn.xyz/repo/loklaan/b7e398d15dff9c59d10a9906d596ad8d/raw/5a0c5271242558eb1bd40e7bef5b1b2b17cfa78c/linkaroo.svg" />
   <sub><em>"g'day"</em></sub>
